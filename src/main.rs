@@ -12,6 +12,7 @@ use ark_ff::{Field, BigInteger, PrimeField, Fp, MontBackend};
 use ark_std::test_rng;
 use ark_ec::{pairing::{Pairing, PairingOutput}, short_weierstrass::Affine, models::*};
 use ark_bn254::Bn254;
+use std::fs::File;
 
 
 use ark_groth16::data_structures::*;
@@ -26,7 +27,7 @@ use ark_relations::{
 };
 
 use std::str::FromStr;
-use std::fs::File;
+// use std::fs::File;
 use std::io::Write;
 
 
@@ -186,7 +187,7 @@ pub fn main() {
 
      // We're going to use the Groth16 proving system.
      use ark_groth16::Groth16;
-     use ark_serialize::*;
+     use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
      
 
      // This may not be cryptographically safe, use
@@ -254,19 +255,42 @@ pub fn main() {
 
                 let string_proof = proof_to_proof_str(&proof);
 
-                println!("string_proof: {:?}", string_proof);
+                // println!("string_proof: {:?}", string_proof);
                 let mut bytes: Vec<u8> = vec![];
-                ark_serialize::CanonicalSerialize::serialize_uncompressed(writer).unwrap();
-                let serialized_proof = proof. (&mut bytes);
+
+                let mut compressed_bytes = Vec::new();
+                proof.serialize_compressed(&mut compressed_bytes).unwrap();
+
+                // println!("compressed_bytes: {:?}", compressed_bytes);
+
+                // let mut file = File::create("data.bin").expect("Failed to create file");
+                // file.write_all(&compressed_bytes).expect("Failed to write to file");
+
+                // let mut file_read = File::open("data.bin").expect("Failed to open file");
+
+                // Read the contents of the file into a Vec<u8>
+                let buffer = match std::fs::read("data.bin") {
+                    Ok(contents) => contents,
+                    Err(e) => {
+                        eprintln!("Error reading file: {}", e);
+                        return;
+                    }
+                };
+
+                println!("buffer: {:?}", buffer);
+                // let a_compressed = G1Affine::deserialize_compressed(&*compressed_bytes).unwrap();
+
+                let proof_back = Proof::<Bls12_377>::deserialize_compressed(&*buffer).unwrap();
+                println!("proof_back: {:?}", proof_back);
 
 
                 let proof_json = serde_json::to_string(&string_proof).unwrap();
 
-                println!("proof_json: {:?}", proof_json);
+                // println!("proof_json: {:?}", proof_json);
 
                 let proof_derived_string: ProofStr = serde_json::from_str(&proof_json).unwrap();
 
-                println!("proof_derived_string: {:?}", proof_derived_string);
+                // println!("proof_derived_string: {:?}", proof_derived_string);
 
                 // let proof_derived: Proof::<Bls12<Config>> = Proof{
                 //     a: E::G1Affine::new(
