@@ -7,10 +7,11 @@ use ark_std::rand::{Rng, RngCore, SeedableRng};
 
 // Bring in some tools for using pairing-friendly curves
 // We're going to use the BLS12-377 pairing-friendly elliptic curve.
-use ark_bls12_377::{Bls12_377, Fr, Config};
-use ark_ff::{Field, BigInteger, PrimeField};
+use ark_bls12_377::{Bls12_377, Fr, Config, FqConfig};
+use ark_ff::{Field, BigInteger, PrimeField, Fp, MontBackend};
 use ark_std::test_rng;
 use ark_ec::{pairing::{Pairing, PairingOutput}, short_weierstrass::Affine, models::*};
+use ark_bn254::Bn254;
 
 
 use ark_groth16::data_structures::*;
@@ -25,6 +26,9 @@ use ark_relations::{
 };
 
 use std::str::FromStr;
+use std::fs::File;
+use std::io::Write;
+
 
 
 use serde::{Serialize, Deserialize, de};
@@ -182,6 +186,7 @@ pub fn main() {
 
      // We're going to use the Groth16 proving system.
      use ark_groth16::Groth16;
+     use ark_serialize::*;
      
 
      // This may not be cryptographically safe, use
@@ -242,14 +247,18 @@ pub fn main() {
             };
 
                 // Create a groth16 proof with our parameters.
-                let proof: Proof<Bls12<Config>> = Groth16::<Bls12_377>::prove(&pk, c, &mut rng).unwrap();
+                let proof = Groth16::<Bls12_377>::prove(&pk, c, &mut rng).unwrap();
                 // println!("proof: {:?}", proof);
-
+                
                 // println!("proof.a: {:?}", );
 
                 let string_proof = proof_to_proof_str(&proof);
 
                 println!("string_proof: {:?}", string_proof);
+                let mut bytes: Vec<u8> = vec![];
+                ark_serialize::CanonicalSerialize::serialize_uncompressed(writer).unwrap();
+                let serialized_proof = proof. (&mut bytes);
+
 
                 let proof_json = serde_json::to_string(&string_proof).unwrap();
 
@@ -287,9 +296,10 @@ pub fn main() {
 
 
 fn proof_to_proof_str(proof: &Proof<Bls12<Config>>) -> ProofStr {
-    let a_xy = proof.a;
-    let b_xy = proof.b;
-    let c_xy = proof.c;
+    let a_xy: Affine<ark_bls12_377::g1::Config> = proof.a;
+    let a_x: ark_ff::Fp<ark_ff::MontBackend<ark_bls12_377::FqConfig, 6>, 6> = a_xy.x;
+    let b_xy: Affine<ark_bls12_377::g2::Config> = proof.b;
+    let c_xy: Affine<ark_bls12_377::g1::Config> = proof.c;
 
     let b_c0_c0 = b_xy.x.c0.to_string();
     let b_c0_c1 = b_xy.y.c1.to_string();
@@ -310,17 +320,16 @@ struct ProofStr {
     c: (String, String),
 }
 
-fn parse_proof<E: Pairing>(proof_string: &ProofStr) -> Result<Proof<E>, Box<dyn std::error::Error>> 
-where
-    E::G1Affine: FromStr, // Ensure that G1Affine and G2Affine can be constructed from strings
-    E::G2Affine: FromStr,
-{
-    
-    let a: Affine<Config> = Affine::<Bls12> {
-        x: E::BaseField::from_str(&proof_string.a.0)?,
-        y: E::BaseField::from_str(&proof_string.a.1)?,
-        infinity: false,
-    };
+// fn parse_proof<E: Pairing>(proof_string: &ProofStr) -> Result<Proof<E>, Box<dyn std::error::Error>> 
+// where
 
-    Ok(Proof::default())
-}
+// {
+    
+//     let a: Affine<ark_bls12_377::g1::Config> = Affine {
+//         x: <E::G1Affine as Into<E::G1Prepared>>::into(proof.a),
+//         y: *ark_bls12_377::g1::G1Affine::y(&proof_string.a.1)?,
+//         infinity: false,
+//     };
+
+//     Ok(Proof::default())
+// }
